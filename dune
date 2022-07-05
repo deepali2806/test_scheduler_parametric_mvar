@@ -1,0 +1,6 @@
+(executable
+  (name test1)
+  (libraries affect eio eio_linux)
+(modules test1)
+  (modes byte exe)
+)
