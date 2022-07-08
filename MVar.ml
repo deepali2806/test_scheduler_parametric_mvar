@@ -16,12 +16,6 @@ let create v = Atomic.make (Full (v, Fun_queue.empty))
 
 let sw = ref true 
 
-
-let counter = ref 0
-let m = Mutex.create ()
-let cv = Condition.create ()
-
-
 (*Retry is remaining for effect handler*)
 let rec put v mv =
   let old_contents = Atomic.get (mv) in
@@ -31,7 +25,6 @@ let rec put v mv =
                                             let newQueue = Fun_queue.push q (v,r) in
                                             let new_contents = Full (v', newQueue) in
                                             p := Atomic.compare_and_set mv old_contents new_contents;
-                                            counter := !counter + 1;
                                             !p
                                             )) 
                     (* if !check then
@@ -54,10 +47,6 @@ let rec put v mv =
                                                   let ret = Atomic.compare_and_set mv old_contents new_contents in 
                                                   if ret then
                                                     begin
-                                                    counter := !counter - 1;
-                                                    (if(!counter = 0) then
-                                                      Condition.signal cv
-                                                    else ());
                                                       let ret1 = resume v in
                                                       if ret1 then ()
                                                       else raise (Abort_take "Excception in Put because it is already aborted")  
@@ -76,7 +65,6 @@ let rec take mv =
                                             let newQueue = Fun_queue.push q r in
                                             let new_contents = Empty newQueue in
                                             p := Atomic.compare_and_set mv old_contents new_contents;
-                                            counter := !counter + 1;
                                             Printf.printf "\nAfter suspend%!";
                                             !p
                                           )
@@ -100,14 +88,7 @@ let rec take mv =
                                                   let ret = Atomic.compare_and_set mv old_contents new_contents in 
                                                   if ret then
                                                     begin
-                                                    counter := !counter - 1;
-                                                    (
-                                                      if(!counter = 0) then
-                                                      Condition.signal cv
-                                                      else ()
-                                                    );
-
-                                                    let ret1 = resume () in 
+                                                      let ret1 = resume () in 
                                                       if ret1 then v
                                                       else raise (Abort_take "Excception in Take because it is already aborted")   
                                                     end

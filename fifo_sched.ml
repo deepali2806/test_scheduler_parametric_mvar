@@ -4,6 +4,11 @@ open Effect.Deep
 (* open Eio_domainslib_interface *)
 
 exception Abort_take of string
+exception Race_condition
+
+let counter = ref 0
+let m = Mutex.create ()
+let cv = Condition.create ()
 
 
 module type S = sig
@@ -30,16 +35,15 @@ module Make () : S = struct
       (* if !MVar.counter = 0 then *)
         begin
           printf "\nWe are waiting and run q is empty%!";
-          Mutex.lock (MVar.m);
-          while (!MVar.counter) <> 0 do
-            Condition.wait (MVar.cv) (MVar.m)
+          Mutex.lock m;
+          while !counter <> 0 do
+            Condition.wait cv m
           done;
-          Mutex.unlock (MVar.m);
+          Mutex.unlock m;
           perform Sched.Stuck
         end
       else 
       begin 
-
         Queue.pop run_q ()
       end
     in
@@ -57,6 +61,12 @@ module Make () : S = struct
               let resumer v = 
                               if !MVar.sw then
                               begin
+                                counter := !counter - 1;
+                                (
+                                  if(!counter = 0) then
+                                  Condition.signal cv
+                                  else ()
+                                );
                                 enqueue k v; 
                                 true
                               end
@@ -65,11 +75,15 @@ module Make () : S = struct
                         in
               if (f resumer) then
                  begin 
-                 printf "\nTaking new task %!";dequeue ()
+                 printf "\nTaking new task %!";
+                 counter := !counter + 1;
+                 dequeue ()
                  end
               else
-                Printf.printf "\nFalse In Suspend%!"
-               
+                begin
+                Printf.printf "\nFalse In Suspend%!"; 
+                raise Race_condition
+                end
                 
                 (* For now do nothing 
                 TODO: Retry *)
