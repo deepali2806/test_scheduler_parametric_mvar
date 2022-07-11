@@ -6,10 +6,12 @@ open Effect.Deep
 exception Abort_take of string
 exception Race_condition
 
-let counter = ref 0
+let counter = Atomic.make 0
 let m = Mutex.create ()
 let cv = Condition.create ()
 
+(* Cancellation switch *)
+let sw = ref true
 
 module type S = sig
   val fork : (unit -> unit) -> unit
@@ -36,7 +38,7 @@ module Make () : S = struct
         begin
           printf "\nWe are waiting and run q is empty%!";
           Mutex.lock m;
-          while !counter <> 0 do
+          while (Atomic.get counter) <> 0 do
             Condition.wait cv m
           done;
           Mutex.unlock m;
@@ -59,11 +61,12 @@ module Make () : S = struct
               enqueue k (); spawn f)
           | Sched.Suspend f -> Some (fun (k: (a,_) continuation) ->
               let resumer v = 
-                              if !MVar.sw then
+                              if !sw then
                               begin
-                                counter := !counter - 1;
+                                (* counter := !counter - 1; *)
+                                Atomic.decr counter;
                                 (
-                                  if(!counter = 0) then
+                                  if(Atomic.get counter = 0) then
                                   Condition.signal cv
                                   else ()
                                 );
@@ -76,7 +79,8 @@ module Make () : S = struct
               if (f resumer) then
                  begin 
                  printf "\nTaking new task %!";
-                 counter := !counter + 1;
+                 Atomic.incr counter;
+                 (* counter := !counter + 1; *)
                  dequeue ()
                  end
               else
@@ -97,7 +101,7 @@ module Make () : S = struct
               end)
            | Abort -> Some (fun (k: (a, _) continuation) ->
               (* Switch off the switch *)
-              MVar.sw := false;
+              sw := false;
 
               Printf.printf "\nAborted in FIfo";
                     (* raise (Abort_take "Queue empty") *)

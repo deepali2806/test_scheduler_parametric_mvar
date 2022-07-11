@@ -14,7 +14,7 @@ let create_empty () = Atomic.make (Empty (Fun_queue.empty))
 
 let create v = Atomic.make (Full (v, Fun_queue.empty))
 
-let sw = ref true 
+(* let sw = ref true  *)
 
 (*Retry is remaining for effect handler*)
 let rec put v mv =

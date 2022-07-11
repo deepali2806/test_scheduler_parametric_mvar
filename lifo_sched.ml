@@ -5,9 +5,12 @@ open Effect.Deep
 exception Abort_take of string
 exception Race_condition
 
-let counter = ref 0
+let counter = Atomic.make 0
 let m = Mutex.create ()
 let cv = Condition.create ()
+
+(* Cancellation switch *)
+let sw = ref true
 
 
 module type S = sig
@@ -39,7 +42,7 @@ module Make () : S = struct
         begin
           printf "\nWe are waiting and run q is empty%!";
           Mutex.lock m;
-          while !counter <> 0 do
+          while (Atomic.get counter) <> 0 do
             Condition.wait cv m
           done;
           Mutex.unlock m;
@@ -59,13 +62,15 @@ module Make () : S = struct
               enqueue k (); spawn f)
           | Sched.Suspend f -> Some (fun (k: (a,_) continuation) ->
              let resumer v = 
-                              if !MVar.sw then
+                              if !sw then
                               begin
-                                counter := !counter - 1;
+                                (* counter := !counter - 1; *)
+                                Atomic.decr counter;
                                 (
-                                  if(!counter = 0) then
-                                  Condition.signal cv
-                                  else ()
+                                  if(Atomic.get counter = 0) then
+                                    Condition.signal cv
+                                  else 
+                                    ()
                                 );
                                 enqueue k v; 
                                 true
@@ -76,9 +81,10 @@ module Make () : S = struct
               if (f resumer) then
                  begin 
                  (* TODO: Think about race/atomicity when multile domains are running parallely and 
-                    Do we need to take same Lifo.run or for each domain? *)
+                    Do we need to take same Lifo.run or for each domain? =====> Done *)
+                    (* When suspend is successful i.e. task is enqueued increment the counter*)
                  printf "\nTaking new task %!";
-                 counter := !counter + 1;
+                 Atomic.incr counter;
                  dequeue ()
                  end
               else
@@ -99,8 +105,7 @@ module Make () : S = struct
               end)
           | Abort -> Some (fun (k: (a, _) continuation) ->
                (* Switch off the switch *)
-              MVar.sw := false;
-
+              sw := false;
               Printf.printf "\nAborted in LIfo";
               dequeue ()
               )            

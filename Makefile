@@ -1,11 +1,16 @@
 OCAMLPATH=~/repos/ocaml-multicore/_install/bin/
 
+# all:
+# 	ocamlfind ocamlopt -o test_fifo_lifo.exe -thread fun_queue.mli fun_queue.ml sched.mli sched.ml MVar.mli MVar.ml \
+# 		fifo_sched.mli fifo_sched.ml lifo_sched.mli lifo_sched.ml test_fifo_lifo.ml 
+
 all:
 	ocamlfind ocamlopt -o test_fifo.exe -thread fun_queue.mli fun_queue.ml sched.mli sched.ml MVar.mli MVar.ml \
-		fifo_sched.mli fifo_sched.ml test_fifo.ml 
+		fifo_sched.mli fifo_sched.ml lifo_sched.mli lifo_sched.ml test_fifo.ml 
 
-#all:
-#	 ocamlfind ocamlopt -o test1.exe -linkpkg -package eio_linux -thread sched.mli sched.ml MVar.mli MVar.ml \
+
+# all:
+# 	 ocamlfind ocamlopt -o test1.exe -linkpkg -package eio_linux -thread sched.mli sched.ml MVar.mli MVar.ml \
 # 		fifo_sched.mli fifo_sched.ml lifo_sched.mli lifo_sched.ml test_fifo.ml 
 
 # all:
